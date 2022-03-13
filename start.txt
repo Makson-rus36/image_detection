@@ -1,0 +1,11 @@
+With train
+python main.py --image_path="images/road-1.jpg" --create_model=1
+
+Without train
+python main.py --image_path="images/road-1.jpg" --create_model=0
+
+With threshold
+python main.py --image_path="images/road-1.jpg" --create_model=0 --threshold=0.96
+
+With search only class 'car'
+python main.py --image_path="images/road-1.jpg" --create_model=0 --detection=car
