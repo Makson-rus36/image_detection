@@ -1,14 +1,3 @@
-labels = ["person", "bicycle", "car", "motorbike", "aeroplane", "bus", "train", "truck",
-          "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench",
-          "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe",
-          "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard",
-          "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard",
-          "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana",
-          "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake",
-          "chair", "sofa", "pottedplant", "bed", "diningtable", "toilet", "tvmonitor", "laptop", "mouse",
-          "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator",
-          "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush"]
-
 import argparse
 import numpy as np
 import struct
@@ -21,14 +10,7 @@ from keras.layers.merge import add, concatenate
 from keras.preprocessing.image import load_img
 from keras.preprocessing.image import img_to_array
 import matplotlib.pyplot as plt
-
-parser = argparse.ArgumentParser()
-parser.add_argument('--image_path', help="Path of image to detect objects", default="images/road-1.jpg")
-parser.add_argument('--create_model', help="Create, train and save model. 0 - Skip; 1 - Enable", default=0)
-parser.add_argument('--threshold', help="Min threshold for detect object. Default: 0.4; Min: 0.1; Max: 1.0",
-                    default=0.98)
-parser.add_argument('--detection', help="Use for detection type object. Default: all", default="all")
-args = parser.parse_args()
+from PIL import Image
 
 
 class WeightReader:
@@ -346,7 +328,7 @@ class DetectObject:
             boxes[i].ymin = int((boxes[i].ymin - y_offset) / y_scale * image_h)
             boxes[i].ymax = int((boxes[i].ymax - y_offset) / y_scale * image_h)
 
-    def draw_boxes(self, filename, v_boxes, v_labels, v_scores, detection: str = 'all'):
+    def draw_boxes(self, filename, v_boxes, v_labels, v_scores, detection: str = 'all', dpi: (int, int) = (300, 300)):
         data = plt.imread(filename)
         plt.imshow(data)
         ax = plt.gca()
@@ -370,7 +352,12 @@ class DetectObject:
                     label = "%s (%.3f)" % (v_labels[i], v_scores[i])
                     plt.text(x1, y1, label, color='red')
 
-        plt.savefig('result.png')
+        plt.xticks([])
+        plt.yticks([])
+        plt.autoscale()
+        plt.axis('off')
+        print(filename + ".result.png")
+        plt.savefig(filename + ".result.png", bbox_inches='tight', pad_inches=0, format="png", dpi=dpi[0])
         return True
 
     def get_boxes(self, boxes, labels, thresh):
@@ -397,31 +384,50 @@ class LoadImage:
         return image, width, height
 
 
-net_h, net_w = 416, 416
-obj_thresh, nms_thresh = 0.5, 0.45
-anchors = [[116, 90, 156, 198, 373, 326], [30, 61, 62, 45, 59, 119], [10, 13, 16, 30, 33, 23]]
+class Start:
+    def start_main(self, create_model: int = 0, image_path: str = "example.jpg", threshold: float = 1.0,
+                   detection_class: str = 'all'):
+        labels = ["person", "bicycle", "car", "motorbike", "aeroplane", "bus", "train", "truck",
+                  "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench",
+                  "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe",
+                  "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard",
+                  "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard",
+                  "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana",
+                  "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake",
+                  "chair", "sofa", "pottedplant", "bed", "diningtable", "toilet", "tvmonitor", "laptop", "mouse",
+                  "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator",
+                  "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush"]
+        net_h, net_w = 416, 416
+        obj_thresh, nms_thresh = 0.5, 0.45
+        anchors = [[116, 90, 156, 198, 373, 326], [30, 61, 62, 45, 59, 119], [10, 13, 16, 30, 33, 23]]
+        try:
+            if create_model == 1:
+                cm = CreateModel()
+            yolov3 = load_model('model.h5')
+            input_w, input_h = 416, 416
+            photo_filename = image_path
+            li = LoadImage()
+            image, image_w, image_h = li.load_image_pixels(photo_filename, (input_w, input_h))
+            if image_w != image_h:
+                return "502"
+            yolos = yolov3.predict(image)
+            class_threshold = threshold
+            boxes = list()
+            dt = DetectObject()
+            for i in range(len(yolos)):
+                boxes += dt.decode_netout(yolos[i][0], anchors[i], obj_thresh, net_h, net_w)
 
-
-def start_main(create_model: int = 0, image_path: str="example.jpg", threshold: float = 1.0, detection_class: str = 'all'):
-    if create_model == 1:
-        cm = CreateModel()
-    yolov3 = load_model('model.h5')
-    input_w, input_h = 416, 416
-    photo_filename = image_path
-    li = LoadImage()
-    image, image_w, image_h = li.load_image_pixels(photo_filename, (input_w, input_h))
-    yolos = yolov3.predict(image)
-    class_threshold = threshold
-    boxes = list()
-    dt = DetectObject()
-    for i in range(len(yolos)):
-        boxes += dt.decode_netout(yolos[i][0], anchors[i], obj_thresh, net_h, net_w)
-
-    dt.correct_yolo_boxes(boxes, image_h, image_w, net_h, net_w)
-    dt.do_nms(boxes, nms_thresh)
-    v_boxes, v_labels, v_scores = dt.get_boxes(boxes, labels, class_threshold)
-    return dt.draw_boxes(photo_filename, v_boxes, v_labels, v_scores, detection_class)
-
-
-if __name__ == "__main__":
-    start_main(0, "images/road-1.jpg" )
+            dt.correct_yolo_boxes(boxes, image_h, image_w, net_h, net_w)
+            dt.do_nms(boxes, nms_thresh)
+            v_boxes, v_labels, v_scores = dt.get_boxes(boxes, labels, class_threshold)
+            im = Image.open(photo_filename)
+            dpi = im.info['dpi']
+            if dpi[0] < 400:
+                dpi = (400, 400)
+            dt.draw_boxes(photo_filename, v_boxes, v_labels, v_scores, detection_class, dpi)
+            return "200"
+        except FileNotFoundError as ErrFile:
+            return "404"
+        except BaseException as Err:
+            print(Err)
+            return "500"
